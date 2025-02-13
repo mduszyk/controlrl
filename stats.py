@@ -35,13 +35,15 @@ class Stats:
     def update(self, name, value):
         self.stats[name].update(value)
 
-    def stats(self):
+    def get(self, reset=False):
         result = {}
         for name, stat in self.stats.items():
             result[f'{name}_min'] = stat.min
             result[f'{name}_max'] = stat.max
             result[f'{name}_mean'] = stat.mean
             result[f'{name}_std'] = stat.std()
+        if reset:
+            self.reset()
         return result
 
     def reset(self):

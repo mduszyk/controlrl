@@ -6,6 +6,8 @@ import torch
 from torch import nn
 from torch.distributions import Normal
 
+from stats import Stats
+
 
 def mlp(input_dim: int, output_dim: int, hidden_size: int, num_hidden: int) -> nn.Module:
     model = nn.Sequnetial()
@@ -17,10 +19,10 @@ def mlp(input_dim: int, output_dim: int, hidden_size: int, num_hidden: int) -> n
     return model
 
 
-def grad_step(optimizer, loss):
-    optimizer.zero_grad()
+def grad_step(opt, loss):
+    opt.zero_grad()
     loss.backward()
-    optimizer.step()
+    opt.step()
 
 
 def update_params(src_net: nn.Module, dst_net: nn.Module, tau: Optional[float] = None):
@@ -97,28 +99,33 @@ class SAC:
         self.buffer = deque(maxlen=params.buffer_max_size)
         self.actor = Actor(state_dim, action_dim, params.actor_lr)
         self.critic = Critic(state_dim, action_dim, params.critic_lr)
+        self.stats = Stats()
 
     def action(self, state):
         if self.actor.policy_net.training:
             return self.actor.stochastic_action(state)
-        return self.actor.stochastic_action(state)
+        return self.actor.deterministic_action(state)
 
     def train_step(self):
         s_batch, a_batch, r_batch, next_s_batch = sample(self.buffer, self.params.batch_size)
 
         loss_v = self.v_loss(s_batch)
         grad_step(self.critic.optimizer_v, loss_v)
+        self.stats.update('loss_v', loss_v.item())
 
         loss_q1 = self.q_loss(self.critic.q1, s_batch, a_batch, r_batch, s_prime_batch)
         grad_step(self.critic.optimizer_q1, loss_q1)
+        self.stats.update('loss_q1', loss_q1.item())
 
         loss_q2 = self.q_loss(self.critic.q2, s_batch, a_batch, r_batch, s_prime_batch)
         grad_step(self.critic.optimizer_q2, loss_q2)
+        self.stats.update('loss_q2', loss_q2.item())
 
         update_params(self.critic.v, self.critic.v_target, tau=self.params.tau)
 
         loss_policy = self.policy_loss(s_batch)
         grad_step(self.actor.optimizer, loss_policy)
+        self.stats.update('loss_policy', loss_policy.item())
 
     def v_loss(self, s_batch):
         v = self.critic.v(s_batch)
