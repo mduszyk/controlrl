@@ -3,6 +3,8 @@ import torch
 import gymnasium as gym
 from gymnasium.wrappers import RecordVideo
 
+import paramflow as pf
+
 from sac import SAC
 
 
@@ -31,7 +33,9 @@ def train_agent(env, agent, num_episodes):
 
 
 def main():
-    agent = SAC()
+    props = pf.load('sac.toml')
+    print(props)
+    agent = SAC(params)
     env = gym.make('Pendulum-v1', render_mode='rgb_array')
     train_agent(env, agent, 10)
     env = RecordVideo(env, video_folder='videos', episode_trigger=lambda e: True)
