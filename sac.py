@@ -71,7 +71,7 @@ class Actor:
         u_log_std = out[..., self.action_dim:]
         u_log_std = torch.clamp(u_log_std, self.log_std_min, self.log_std_max)
         u_std = torch.exp(u_log_std)
-        u = u_mean + u_std * torch.randn(u_mean.shape)
+        u = u_mean + u_std * torch.randn(u_mean.shape, device=u_mean.device)
         return u, u_mean, u_std
 
     def stochastic_action(self, state):
@@ -117,7 +117,7 @@ class SAC:
         return self.actor.deterministic_action(state)
 
     def add_transition(self, state, action, reward, next_state):
-        transition = state.cpu(), action, reward, next_state.cpu()
+        transition = state.cpu(), action.cpu(), reward, next_state.cpu()
         self.buffer.append(transition)
 
     def train_step(self):
