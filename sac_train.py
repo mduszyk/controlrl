@@ -2,6 +2,7 @@ import json
 import logging
 
 import gymnasium as gym
+import mlflow
 import paramflow as pf
 import torch
 from gymnasium.wrappers import RecordVideo, NumpyToTorch
@@ -13,7 +14,9 @@ def run_episode(env, agent, train: bool = False):
     done = False
     state, _ = env.reset()
     payoff = 0
+    t = 0
     while not done:
+        t += 1
         action = agent.action(state, train)
         next_state, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
@@ -22,32 +25,41 @@ def run_episode(env, agent, train: bool = False):
             agent.train_step()
         state = next_state
         payoff += reward
-    return payoff
+    return payoff, t
 
 
-def train_agent(env, agent, num_episodes):
-    for episode in range(num_episodes):
-        payoff = run_episode(env, agent, train=True)
+def train_agent(env, agent, num_episodes, checkpoint_freq=10):
+    for episode in range(1, num_episodes + 1):
+        payoff, episode_time = run_episode(env, agent, train=True)
         logging.info('episode %d, payoff: %f', episode, payoff)
-        stats = agent.stats.get(reset=True)
-        logging.info(stats)
+        metrics = agent.stats.get(reset=True)
+        metrics['payoff'] = payoff
+        metrics['time'] = episode_time
+        mlflow.log_metrics(metrics, episode)
+        if episode % checkpoint_freq == 0:
+            mlflow.pytorch.log_model(agent.actor.policy_net, f'policy_net_episode_{episode}')
 
 
 def main():
     logging.basicConfig(format='%(asctime)s %(module)s %(levelname)s %(message)s', level=logging.INFO)
     params = pf.load('sac.toml')
+    mlflow.set_experiment('SAC')
     logging.info(json.dumps(params, indent=4))
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logging.info('device: %s', device)
-    env = gym.make('Pendulum-v1', render_mode='rgb_array')
+    env = gym.make(params.gym_env_id, render_mode='rgb_array')
     env = NumpyToTorch(env, device)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     agent = SAC(state_dim, action_dim, params, device)
-    train_agent(env, agent, params.train_episodes)
-    env = RecordVideo(env, name_prefix='Pendulum-v1', video_folder='videos', episode_trigger=lambda e: True)
+
+    with mlflow.start_run(run_name=params.gym_env_id):
+        mlflow.log_params(params)
+        train_agent(env, agent, params.train_episodes)
+
+    env = RecordVideo(env, name_prefix=params.gym_env_id, video_folder='videos', episode_trigger=lambda e: True)
     with torch.no_grad():
-        payoff = run_episode(env, agent)
+        payoff, _ = run_episode(env, agent)
         logging.info('test episode payoff: %f', payoff)
     env.close()
 
