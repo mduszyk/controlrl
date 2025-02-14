@@ -29,13 +29,16 @@ def run_episode(env, agent, train: bool = False):
 
 
 def train_agent(env, agent, num_episodes, checkpoint_freq):
+    step = 0
     for episode in range(1, num_episodes + 1):
-        payoff, episode_time = run_episode(env, agent, train=True)
-        logging.info('episode %d, payoff: %f, episode time: %d', episode, payoff, episode_time)
+        payoff, episode_len = run_episode(env, agent, train=True)
+        step += episode_len
+        logging.info('episode %d payoff %f len %d buf %d', episode, payoff, episode_len, len(agent.buffer))
         metrics = agent.stats.get(reset=True)
         metrics['payoff'] = payoff
-        metrics['time'] = episode_time
-        mlflow.log_metrics(metrics, episode)
+        metrics['length'] = episode_len
+        metrics['buffer'] = len(agent.buffer)
+        mlflow.log_metrics(metrics, step)
         if episode % checkpoint_freq == 0:
             mlflow.pytorch.log_model(agent.actor.policy_net, f'policy_net_episode_{episode}')
 
