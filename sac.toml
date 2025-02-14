@@ -23,5 +23,18 @@ batch_size = 256
 min_buffer_size = 10_000
 max_buffer_size = 1_000_000
 
-train_episodes = 1000
+train_episodes = 4000
 checkpoint_freq = 100
+
+
+[humanoid]
+gym_env_id = 'Humanoid-v5'
+dtype = 'float64'
+batch_size = 256
+
+min_buffer_size = 10_000
+max_buffer_size = 1_000_000
+
+train_episodes = 10000
+checkpoint_freq = 100
+reward_scale = 20
