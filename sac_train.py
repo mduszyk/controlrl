@@ -28,7 +28,7 @@ def run_episode(env, agent, train: bool = False):
     return payoff, t
 
 
-def train_agent(env, agent, num_episodes, checkpoint_freq=10):
+def train_agent(env, agent, num_episodes, checkpoint_freq):
     for episode in range(1, num_episodes + 1):
         payoff, episode_time = run_episode(env, agent, train=True)
         logging.info('episode %d, payoff: %f', episode, payoff)
@@ -47,6 +47,7 @@ def main():
     logging.info(json.dumps(params, indent=4))
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logging.info('device: %s', device)
+
     env = gym.make(params.gym_env_id, render_mode='rgb_array')
     env = NumpyToTorch(env, device)
     state_dim = env.observation_space.shape[0]
@@ -55,12 +56,12 @@ def main():
 
     with mlflow.start_run(run_name=params.gym_env_id):
         mlflow.log_params(params)
-        train_agent(env, agent, params.train_episodes)
+        train_agent(env, agent, params.train_episodes, params.checkpoint_freq)
 
     env = RecordVideo(env, name_prefix=params.gym_env_id, video_folder='videos', episode_trigger=lambda e: True)
     with torch.no_grad():
-        payoff, _ = run_episode(env, agent)
-        logging.info('test episode payoff: %f', payoff)
+        payoff, episode_time = run_episode(env, agent)
+        logging.info('test episode payoff: %f, episode_time: %d', payoff, episode_time)
     env.close()
 
 
