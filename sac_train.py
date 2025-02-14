@@ -53,7 +53,8 @@ def main():
     env = NumpyToTorch(env, device)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
-    agent = SAC(state_dim, action_dim, params, device)
+    dtype = getattr(torch, params.dtype)
+    agent = SAC(state_dim, action_dim, params, device, dtype)
 
     with mlflow.start_run(run_name=params.gym_env_id):
         mlflow.log_params(params)

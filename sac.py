@@ -53,8 +53,8 @@ def sample(buffer, batch_size, device):
 
 class Actor:
 
-    def __init__(self, state_dim, action_dim, lr, device):
-        self.policy_net = mlp(state_dim, 2 * action_dim, 256, 2).to(device)
+    def __init__(self, state_dim, action_dim, lr, device, dtype):
+        self.policy_net = mlp(state_dim, 2 * action_dim, 256, 2).to(dtype).to(device)
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=lr)
         self.action_dim = action_dim
         self.log_std_min = -20
@@ -89,12 +89,12 @@ class Actor:
 
 class Critic:
 
-    def __init__(self, state_dim, action_dim, lr, device):
-        self.v = mlp(state_dim, 1, 256, 2).to(device)
-        self.v_target = mlp(state_dim, 1, 256, 2).to(device)
+    def __init__(self, state_dim, action_dim, lr, device, dtype):
+        self.v = mlp(state_dim, 1, 256, 2).to(dtype).to(device)
+        self.v_target = mlp(state_dim, 1, 256, 2).to(dtype).to(device)
         update_params(self.v, self.v_target)
-        self.q1 = mlp(state_dim + action_dim, 1, 256, 2).to(device)
-        self.q2 = mlp(state_dim + action_dim, 1, 256, 2).to(device)
+        self.q1 = mlp(state_dim + action_dim, 1, 256, 2).to(dtype).to(device)
+        self.q2 = mlp(state_dim + action_dim, 1, 256, 2).to(dtype).to(device)
         self.optimizer_v = torch.optim.Adam(self.v.parameters(), lr)
         self.optimizer_q1 = torch.optim.Adam(self.q1.parameters(), lr)
         self.optimizer_q2 = torch.optim.Adam(self.q2.parameters(), lr)
@@ -102,12 +102,12 @@ class Critic:
 
 class SAC:
 
-    def __init__(self, state_dim, action_dim, params, device):
+    def __init__(self, state_dim, action_dim, params, device, dtype):
         self.params = params
         self.device = device
         self.buffer = deque(maxlen=params.max_buffer_size)
-        self.actor = Actor(state_dim, action_dim, params.actor_lr, device)
-        self.critic = Critic(state_dim, action_dim, params.critic_lr, device)
+        self.actor = Actor(state_dim, action_dim, params.actor_lr, device, dtype)
+        self.critic = Critic(state_dim, action_dim, params.critic_lr, device, dtype)
         self.stats = Stats()
 
     @torch.no_grad()
