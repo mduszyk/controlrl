@@ -24,7 +24,7 @@ class Stat:
         return self.m2 / self.n
 
     def std(self):
-        return np.sqrt(self.var()) if self.n > 1 else 0.0
+        return math.sqrt(self.var()) if self.n > 1 else 0.0
 
 
 class Stats:

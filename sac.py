@@ -1,16 +1,18 @@
-from collections import deque
+import random
+from collections import deque, namedtuple
 from typing import Optional
 
-import numpy as np
 import torch
 from torch import nn
 from torch.distributions import Normal
 
 from stats import Stats
 
+Transition = namedtuple('Transition', ['state', 'action', 'reward', 'next_state'])
+
 
 def mlp(input_dim: int, output_dim: int, hidden_size: int, num_hidden: int) -> nn.Module:
-    model = nn.Sequnetial()
+    model = nn.Sequential()
     for _ in range(num_hidden):
         model.append(nn.Linear(input_dim, hidden_size))
         model.append(nn.ReLU())
@@ -33,26 +35,26 @@ def update_params(src_net: nn.Module, dst_net: nn.Module, tau: Optional[float] =
             param_dst.data.copy_(param_src.data)
 
 
-def sample(buffer, batch_size):
+def sample(buffer, batch_size, device):
     state_batch, action_batch, reward_batch, next_state_batch = [], [], [], []
-    for s, a, r, next_s in random.sample(buffer, batch_size):
-        state_batch.append(s)
-        action_batch.append(a)
-        reward_batch.append(r)
-        next_state_batch.append(next_s)
-    state_batch = torch.tensor(state_batch)
-    action_batch = torch.tensor(action_batch)
-    reward_batch = torch.tensor(reward_batch)
-    next_state_batch = torch.tensor(next_state_batch)
+    for state, action, reward, next_state in random.sample(buffer, batch_size):
+        state_batch.append(state)
+        action_batch.append(action)
+        reward_batch.append(reward)
+        next_state_batch.append(next_state)
+    state_batch = torch.stack(state_batch).to(device, non_blocking=True)
+    action_batch = torch.stack(action_batch).to(device, non_blocking=True)
+    reward_batch = torch.tensor(reward_batch).view(batch_size, 1).to(device, non_blocking=True)
+    next_state_batch = torch.stack(next_state_batch).to(device, non_blocking=True)
     # normalize rewards
     reward_batch = (reward_batch - reward_batch.mean()) / (reward_batch.std() + 1e-7)
-    return state_batch, action_batch, reward_batch, next_state_batch
+    return Transition(state_batch, action_batch, reward_batch, next_state_batch)
 
 
 class Actor:
 
-    def __init__(self, state_dim, action_dim, lr):
-        self.policy_net = mlp(state_dim, 2 * action_dim, 256, 2)
+    def __init__(self, state_dim, action_dim, lr, device):
+        self.policy_net = mlp(state_dim, 2 * action_dim, 256, 2).to(device)
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=lr)
         self.action_dim = action_dim
         self.log_std_min = -20
@@ -69,12 +71,17 @@ class Actor:
         u_log_std = out[:, self.action_dim:]
         u_log_std = torch.clamp(u_log_std, self.log_std_min, self.log_std_max)
         u_std = torch.exp(u_log_std)
-        # sample action
-        u = u_mean + u_std * torch.normal(0, 1, size=u_mean.shape)
-        return torch.tanh(u), u_mean, u_std
+        u = u_mean + u_std * torch.randn(u_mean.shape)
+        return torch.tanh(u)
 
     def action_and_log_prob(self, state):
-        action, u_mean, u_std = self.stochastic_action(state)
+        out = self.policy_net(state)
+        u_mean = out[:, :self.action_dim]
+        u_log_std = out[:, self.action_dim:]
+        u_log_std = torch.clamp(u_log_std, self.log_std_min, self.log_std_max)
+        u_std = torch.exp(u_log_std)
+        u = u_mean + u_std * torch.randn(u_mean.shape)
+        action = torch.tanh(u)
         pdf_u = Normal(u_mean, u_std)
         log_prob = pdf_u.log_prob(u) - torch.log(1 - action ** 2 + 1e-6)
         return action, log_prob
@@ -82,11 +89,12 @@ class Actor:
 
 class Critic:
 
-    def __init__(self, state_dim, action_dim, lr):
-        self.v = mlp(state_dim + action_dim, 1, 256, 2)
-        self.v_target = mlp(state_dim + action_dim, 1, 256, 2)
-        self.q1 = mlp(state_dim + action_dim, 1, 256, 2)
-        self.q2 = mlp(state_dim + action_dim, 1, 256, 2)
+    def __init__(self, state_dim, action_dim, lr, device):
+        self.v = mlp(state_dim, 1, 256, 2).to(device)
+        self.v_target = mlp(state_dim, 1, 256, 2).to(device)
+        update_params(self.v, self.v_target)
+        self.q1 = mlp(state_dim + action_dim, 1, 256, 2).to(device)
+        self.q2 = mlp(state_dim + action_dim, 1, 256, 2).to(device)
         self.optimizer_v = torch.optim.Adam(self.v.parameters(), lr)
         self.optimizer_q1 = torch.optim.Adam(self.q1.parameters(), lr)
         self.optimizer_q2 = torch.optim.Adam(self.q2.parameters(), lr)
@@ -94,58 +102,66 @@ class Critic:
 
 class SAC:
 
-    def __init__(self, params):
+    def __init__(self, state_dim, action_dim, params, device):
         self.params = params
-        self.buffer = deque(maxlen=params.buffer_max_size)
-        self.actor = Actor(state_dim, action_dim, params.actor_lr)
-        self.critic = Critic(state_dim, action_dim, params.critic_lr)
+        self.device = device
+        self.buffer = deque(maxlen=params.max_buffer_size)
+        self.actor = Actor(state_dim, action_dim, params.actor_lr, device)
+        self.critic = Critic(state_dim, action_dim, params.critic_lr, device)
         self.stats = Stats()
 
-    def action(self, state):
+    @torch.no_grad()
+    def action(self, state: torch.Tensor):
+        state = state.unsqueeze(0) if state.dim() < 2 else state
         if self.actor.policy_net.training:
-            return self.actor.stochastic_action(state)
-        return self.actor.deterministic_action(state)
+            return self.actor.stochastic_action(state).squeeze(0)
+        return self.actor.deterministic_action(state).squeeze(0)
+
+    def add_transition(self, state, action, reward, next_state):
+        transition = state.cpu(), action, reward, next_state.cpu()
+        self.buffer.append(transition)
 
     def train_step(self):
-        s_batch, a_batch, r_batch, next_s_batch = sample(self.buffer, self.params.batch_size)
+        if len(self.buffer) < self.params.min_buffer_size:
+            return
 
-        loss_v = self.v_loss(s_batch)
+        batch = sample(self.buffer, self.params.batch_size, self.device)
+
+        loss_v = self.v_loss(batch.state)
         grad_step(self.critic.optimizer_v, loss_v)
         self.stats.update('loss_v', loss_v.item())
 
-        loss_q1 = self.q_loss(self.critic.q1, s_batch, a_batch, r_batch, s_prime_batch)
+        loss_q1 = self.q_loss(self.critic.q1, batch)
         grad_step(self.critic.optimizer_q1, loss_q1)
         self.stats.update('loss_q1', loss_q1.item())
 
-        loss_q2 = self.q_loss(self.critic.q2, s_batch, a_batch, r_batch, s_prime_batch)
+        loss_q2 = self.q_loss(self.critic.q2, batch)
         grad_step(self.critic.optimizer_q2, loss_q2)
         self.stats.update('loss_q2', loss_q2.item())
 
         update_params(self.critic.v, self.critic.v_target, tau=self.params.tau)
 
-        loss_policy = self.policy_loss(s_batch)
+        loss_policy = self.policy_loss(batch.state)
         grad_step(self.actor.optimizer, loss_policy)
         self.stats.update('loss_policy', loss_policy.item())
 
-    def v_loss(self, s_batch):
-        v = self.critic.v(s_batch)
-        actions, log_probs = self.actor.action_and_log_prob(s_batch)
-        q = self.min_q(s_batch, actions)
+    def v_loss(self, states):
+        v = self.critic.v(states)
+        actions, log_probs = self.actor.action_and_log_prob(states)
+        q = self.min_q(states, actions)
         return ((v - q + log_probs) ** 2).mean()
 
-    def q_loss(self, q_net, s_batch, a_batch, r_batch, s_prime_batch):
-        q_input = torch.cat(tensors=(s_batch, a_batch), dim=1)
-        q = q_net(q_input)
-        q_hat = self.reward_scale * r_batch + self.gamma * self.critic.v_target(s_prime_batch)
-        return ((q - q_hat) ** 2).mean()
+    def q_loss(self, q_net, batch):
+        states_actions = torch.cat(tensors=(batch.state, batch.action), dim=1)
+        q = q_net(states_actions)
+        q_target = self.params.reward_scale * batch.reward + self.params.gamma * self.critic.v_target(batch.next_state)
+        return ((q - q_target) ** 2).mean()
 
-    def min_q(self, s_batch, a_batch):
-        q_input = torch.cat(tensors=(s_batch, a_batch), dim=1)
-        q1 = self.critic.q1(q_input)
-        q2 = self.critic.q2(q_input)
-        return torch.min(q1, q2)
+    def min_q(self, states, actions):
+        states_actions = torch.cat(tensors=(states, actions), dim=1)
+        return torch.min(self.critic.q1(states_actions), self.critic.q2(states_actions))
 
-    def policy_loss(self, s_batch):
-        actions, log_probs = self.actor.action_and_log_prob(s_batch)
-        q = self.min_q(s_batch, actions)
+    def policy_loss(self, states):
+        actions, log_probs = self.actor.action_and_log_prob(states)
+        q = self.min_q(states, actions)
         return (log_probs - q).mean()
