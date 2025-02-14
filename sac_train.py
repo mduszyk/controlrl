@@ -29,7 +29,7 @@ def train_agent(env, agent, num_episodes):
     for episode in range(num_episodes):
         payoff = run_episode(env, agent, train=True)
         stats = agent.stats.get(reset=True)
-        logging.info('episode %d, payoff: %d, %s', episode, payoff, stats)
+        logging.info('episode %d, payoff: %f, %s', episode, payoff, stats)
 
 
 def main():
@@ -46,7 +46,8 @@ def main():
     train_agent(env, agent, params.train_episodes)
     env = RecordVideo(env, name_prefix='Pendulum-v1', video_folder='videos', episode_trigger=lambda e: True)
     with torch.no_grad():
-        run_episode(env, agent)
+        payoff = run_episode(env, agent)
+        logging.info('test episode payoff: %f', payoff)
     env.close()
 
 

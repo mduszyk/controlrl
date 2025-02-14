@@ -62,13 +62,13 @@ class Actor:
 
     def deterministic_action(self, state):
         out = self.policy_net(state)
-        u_mean = out[:, :self.action_dim]
+        u_mean = out[..., :self.action_dim]
         return torch.tanh(u_mean)
 
     def stochastic_action(self, state):
         out = self.policy_net(state)
-        u_mean = out[:, :self.action_dim]
-        u_log_std = out[:, self.action_dim:]
+        u_mean = out[..., :self.action_dim]
+        u_log_std = out[..., self.action_dim:]
         u_log_std = torch.clamp(u_log_std, self.log_std_min, self.log_std_max)
         u_std = torch.exp(u_log_std)
         u = u_mean + u_std * torch.randn(u_mean.shape)
@@ -76,8 +76,8 @@ class Actor:
 
     def action_and_log_prob(self, state):
         out = self.policy_net(state)
-        u_mean = out[:, :self.action_dim]
-        u_log_std = out[:, self.action_dim:]
+        u_mean = out[..., :self.action_dim]
+        u_log_std = out[..., self.action_dim:]
         u_log_std = torch.clamp(u_log_std, self.log_std_min, self.log_std_max)
         u_std = torch.exp(u_log_std)
         u = u_mean + u_std * torch.randn(u_mean.shape)
@@ -112,10 +112,9 @@ class SAC:
 
     @torch.no_grad()
     def action(self, state: torch.Tensor):
-        state = state.unsqueeze(0) if state.dim() < 2 else state
         if self.actor.policy_net.training:
-            return self.actor.stochastic_action(state).squeeze(0)
-        return self.actor.deterministic_action(state).squeeze(0)
+            return self.actor.stochastic_action(state)
+        return self.actor.deterministic_action(state)
 
     def add_transition(self, state, action, reward, next_state):
         transition = state.cpu(), action, reward, next_state.cpu()
