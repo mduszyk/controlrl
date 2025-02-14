@@ -65,26 +65,26 @@ class Actor:
         u_mean = out[..., :self.action_dim]
         return torch.tanh(u_mean)
 
-    def stochastic_action(self, state):
+    def _sample_policy_net(self, state):
         out = self.policy_net(state)
         u_mean = out[..., :self.action_dim]
         u_log_std = out[..., self.action_dim:]
         u_log_std = torch.clamp(u_log_std, self.log_std_min, self.log_std_max)
         u_std = torch.exp(u_log_std)
         u = u_mean + u_std * torch.randn(u_mean.shape)
-        return torch.tanh(u)
+        return u, u_mean, u_std
+
+    def stochastic_action(self, state):
+        u, _, _ = self._sample_policy_net(state)
+        action = torch.tanh(u)
+        return action
 
     def action_and_log_prob(self, state):
-        out = self.policy_net(state)
-        u_mean = out[..., :self.action_dim]
-        u_log_std = out[..., self.action_dim:]
-        u_log_std = torch.clamp(u_log_std, self.log_std_min, self.log_std_max)
-        u_std = torch.exp(u_log_std)
-        u = u_mean + u_std * torch.randn(u_mean.shape)
+        u, u_mean, u_std = self._sample_policy_net(state)
         action = torch.tanh(u)
         pdf_u = Normal(u_mean, u_std)
-        log_prob = pdf_u.log_prob(u) - torch.log(1 - action ** 2 + 1e-6)
-        return action, log_prob
+        log_prob_action = pdf_u.log_prob(u) - torch.log(1 - action ** 2 + 1e-6)
+        return action, log_prob_action
 
 
 class Critic:
@@ -111,8 +111,8 @@ class SAC:
         self.stats = Stats()
 
     @torch.no_grad()
-    def action(self, state: torch.Tensor):
-        if self.actor.policy_net.training:
+    def action(self, state: torch.Tensor, stochastic: bool = False):
+        if stochastic:
             return self.actor.stochastic_action(state)
         return self.actor.deterministic_action(state)
 

@@ -14,7 +14,7 @@ def run_episode(env, agent, train: bool = False):
     state, _ = env.reset()
     payoff = 0
     while not done:
-        action = agent.action(state)
+        action = agent.action(state, train)
         next_state, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
         if train:
@@ -28,8 +28,9 @@ def run_episode(env, agent, train: bool = False):
 def train_agent(env, agent, num_episodes):
     for episode in range(num_episodes):
         payoff = run_episode(env, agent, train=True)
+        logging.info('episode %d, payoff: %f', episode, payoff)
         stats = agent.stats.get(reset=True)
-        logging.info('episode %d, payoff: %f, %s', episode, payoff, stats)
+        logging.info(stats)
 
 
 def main():
