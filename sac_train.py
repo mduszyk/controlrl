@@ -5,7 +5,7 @@ import gymnasium as gym
 import mlflow
 import paramflow as pf
 import torch
-from gymnasium.wrappers import RecordVideo, NumpyToTorch
+from gymnasium.wrappers import RecordVideo, NumpyToTorch, RescaleAction
 
 from sac import SAC
 
@@ -31,7 +31,7 @@ def run_episode(env, agent, train: bool = False):
 def train_agent(env, agent, num_episodes, checkpoint_freq):
     for episode in range(1, num_episodes + 1):
         payoff, episode_time = run_episode(env, agent, train=True)
-        logging.info('episode %d, payoff: %f', episode, payoff)
+        logging.info('episode %d, payoff: %f, episode time: %d', episode, payoff, episode_time)
         metrics = agent.stats.get(reset=True)
         metrics['payoff'] = payoff
         metrics['time'] = episode_time
@@ -49,6 +49,7 @@ def main():
     logging.info('device: %s', device)
 
     env = gym.make(params.gym_env_id, render_mode='rgb_array')
+    env = RescaleAction(env, min_action=-1, max_action=1)
     env = NumpyToTorch(env, device)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
