@@ -49,7 +49,7 @@ def main():
         logging.info('video episode, payoff: %f, time: %d', payoff, episode_time)
     env.close()
 
-    logging.info('test stats %s', stats)
+    logging.info('test stats:\n%s', json.dumps(stats, indent=4))
 
 
 if __name__ == '__main__':
