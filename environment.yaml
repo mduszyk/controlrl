@@ -7,7 +7,6 @@ dependencies:
   - numpy=1.26.4=py312heda63a1_0
   - pytorch=2.5.1=py3.12_cuda12.4_cudnn9.1.0_0
   - pytorch-cuda=12.4=hc786d27_7
-  - matplotlib=3.9.3=py312h7900ff3_0
   - pytest
   - pip:
       - mlflow==2.19.0
