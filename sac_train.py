@@ -17,7 +17,7 @@ def run_episode(env, agent, train: bool = False):
     t = 0
     while not done:
         t += 1
-        action = agent.action(state, train)
+        action = agent.action(state)
         next_state, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
         if train:
@@ -45,7 +45,7 @@ def train_agent(env, agent, num_episodes, checkpoint_freq):
 
 def main():
     logging.basicConfig(format='%(asctime)s %(module)s %(levelname)s %(message)s', level=logging.INFO)
-    params = pf.load('sac.toml')
+    params = pf.load('sac_train.toml')
     mlflow.set_experiment('SAC')
     logging.info(json.dumps(params, indent=4))
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -63,7 +63,8 @@ def main():
         mlflow.log_params(params)
         train_agent(env, agent, params.train_episodes, params.checkpoint_freq)
 
-    env = RecordVideo(env, name_prefix=params.gym_env_id, video_folder='videos', episode_trigger=lambda e: True)
+    name_prefix = f'{params.gym_env_id}_{params.train_episodes}'
+    env = RecordVideo(env, name_prefix=name_prefix, video_folder=params.videos_dir, episode_trigger=lambda e: True)
     with torch.no_grad():
         payoff, episode_time = run_episode(env, agent)
         logging.info('test episode payoff: %f, episode_time: %d', payoff, episode_time)

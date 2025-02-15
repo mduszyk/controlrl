@@ -1,0 +1,9 @@
+[default]
+model_uri = 'runs:/664b71e1c8f24e53ba7f14ad95b0aac0/policy_net_episode_50'
+test_episodes = 30
+
+[ant]
+model_uri = 'runs:/944b8709f1eb4896a2efe57c2b4b5295/policy_net_episode_1000'
+
+[humanoid]
+model_uri = 'runs:/2b5cbb976c2749da96429f80dd3826cf/policy_net_episode_10000'

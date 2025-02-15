@@ -9,11 +9,12 @@ gamma = 0.99
 reward_scale = 5
 
 train_episodes = 50
-test_episodes = 300
 checkpoint_freq = 10
 
 actor_lr = 3e-4
 critic_lr = 3e-4
+
+videos_dir = 'videos'
 
 [ant]
 gym_env_id = 'Ant-v5'
@@ -23,7 +24,7 @@ batch_size = 256
 min_buffer_size = 10_000
 max_buffer_size = 1_000_000
 
-train_episodes = 4000
+train_episodes = 5000
 checkpoint_freq = 100
 
 

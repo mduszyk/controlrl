@@ -53,14 +53,15 @@ def sample(buffer, batch_size, device):
 
 class Actor:
 
-    def __init__(self, state_dim, action_dim, lr, device, dtype):
-        self.policy_net = mlp(state_dim, 2 * action_dim, 256, 2).to(dtype).to(device)
-        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=lr)
+    def __init__(self, action_dim, policy_net, optimizer=None):
+        self.policy_net = policy_net
+        self.optimizer = optimizer
         self.action_dim = action_dim
         self.log_std_min = -20
         self.log_std_max = 2
 
-    def deterministic_action(self, state):
+    @torch.no_grad()
+    def action(self, state):
         out = self.policy_net(state)
         u_mean = out[..., :self.action_dim]
         return torch.tanh(u_mean)
@@ -106,15 +107,15 @@ class SAC:
         self.params = params
         self.device = device
         self.buffer = deque(maxlen=params.max_buffer_size)
-        self.actor = Actor(state_dim, action_dim, params.actor_lr, device, dtype)
+        policy_net = mlp(state_dim, 2 * action_dim, 256, 2).to(dtype).to(device)
+        policy_optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=params.actor_lr)
+        self.actor = Actor(action_dim, policy_net, policy_optimizer)
         self.critic = Critic(state_dim, action_dim, params.critic_lr, device, dtype)
         self.stats = Stats()
 
     @torch.no_grad()
-    def action(self, state: torch.Tensor, stochastic: bool = False):
-        if stochastic:
-            return self.actor.stochastic_action(state)
-        return self.actor.deterministic_action(state)
+    def action(self, state: torch.Tensor):
+        return self.actor.stochastic_action(state)
 
     def add_transition(self, state, action, reward, next_state):
         transition = state.cpu(), action.cpu(), reward, next_state.cpu()
