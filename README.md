@@ -18,4 +18,5 @@ python sac_train.py --profile humanoid
 python sac_eval.py
 python sac_eval.py --profile ant
 python sac_eval.py --profile humanoid
+python sac_eval.py --profile ant --model_uri 'runs:/55db85ebf343496783f5f2b88389b604/policy_net_episode_1100'
 ```

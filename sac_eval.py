@@ -23,7 +23,7 @@ def test_agent(env, agent, num_episodes):
 
 def main():
     logging.basicConfig(format='%(asctime)s %(module)s %(levelname)s %(message)s', level=logging.INFO)
-    params = pf.load(['sac_train.toml', 'sac_eval.toml'])
+    params = pf.load('sac_train.toml', 'sac_eval.toml')
     logging.info(json.dumps(params, indent=4))
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
