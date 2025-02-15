@@ -117,7 +117,7 @@ class SAC:
         self.device = device
         self.buffer = deque(maxlen=params.max_buffer_size)
         policy_net = mlp(state_dim, 2 * action_dim, 256, 2).to(dtype).to(device)
-        policy_optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=params.actor_lr)
+        policy_optimizer = torch.optim.Adam(policy_net.parameters(), lr=params.actor_lr)
         self.actor = Actor(action_dim, policy_net, policy_optimizer)
         self.critic = Critic(state_dim, action_dim, params.critic_lr, device, dtype)
         self.stats = Stats()
