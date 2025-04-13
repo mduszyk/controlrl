@@ -1,5 +1,6 @@
 ## SAC
 Implementation of Soft Actor-Critic (SAC) reinforcement learning algorithm for Multi-Joint dynamics with Contact (MuJoCo).
+See: https://gymnasium.farama.org/environments/mujoco/
 
 ### Run local mlflow
 ```shell
