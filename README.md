@@ -1,5 +1,10 @@
 ## SAC
-Implementation of Soft Actor-Critic (SAC) reinforcement learning algorithm for Multi-Joint dynamics with Contact (MuJoCo).
+This project provides an implementation of the Soft Actor-Critic (SAC)
+algorithm for solving continuous control tasks using environments from
+OpenAI Gym (e.g., MuJoCo). SAC is an off-policy actor-critic algorithm
+that combines maximum entropy reinforcement learning with function
+approximation for efficient and stable training.
+
 See: https://gymnasium.farama.org/environments/mujoco/
 
 ### Run local mlflow
